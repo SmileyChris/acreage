@@ -52,6 +52,11 @@ public partial class Main : Node3D
     private ImmediateMesh _aimLineMesh = null!;
     private MeshInstance3D _aimLine = null!;
     private MeshInstance3D _aimMarker = null!;
+    private WorldEnvironment _worldEnv = null!;
+    private Godot.Environment _normalEnvironment = null!;
+    private Godot.Environment _underwaterEnvironment = null!;
+    private ColorRect _underwaterOverlay = null!;
+    private bool _isUnderwater;
 
     public override void _Ready()
     {
@@ -94,6 +99,7 @@ public partial class Main : Node3D
             forward.Z);
 
         _waterPlane.GlobalPosition = new Vector3(_camera.GlobalPosition.X, WaterLevel, _camera.GlobalPosition.Z);
+        UpdateUnderwaterEffect();
 
         _chunkRenderer.DrainPendingChunks();
         _chunkRenderer.DrainPendingCollisionUpdates();
@@ -214,19 +220,40 @@ public partial class Main : Node3D
         // Procedural sky
         var skyMaterial = new ProceduralSkyMaterial();
         var sky = new Sky { SkyMaterial = skyMaterial };
-        var environment = new Godot.Environment
+        _normalEnvironment = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Sky,
             Sky = sky,
             AmbientLightSource = Godot.Environment.AmbientSource.Sky,
             ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
         };
-        var worldEnv = new WorldEnvironment
+        _underwaterEnvironment = new Godot.Environment
+        {
+            BackgroundMode = Godot.Environment.BGMode.Color,
+            BackgroundColor = new Color(0.02f, 0.08f, 0.12f),
+            AmbientLightSource = Godot.Environment.AmbientSource.Color,
+            AmbientLightColor = new Color(0.05f, 0.15f, 0.2f),
+            AmbientLightEnergy = 0.4f,
+            FogEnabled = true,
+            FogLightColor = new Color(0.03f, 0.12f, 0.18f),
+            FogLightEnergy = 0.3f,
+            FogDensity = 0.06f,
+        };
+        _worldEnv = new WorldEnvironment
         {
             Name = "WorldEnvironment",
-            Environment = environment,
+            Environment = _normalEnvironment,
         };
-        AddChild(worldEnv);
+        AddChild(_worldEnv);
+
+        // Underwater tint overlay
+        _underwaterOverlay = new ColorRect
+        {
+            Color = new Color(0.0f, 0.08f, 0.15f, 0.35f),
+            Visible = false,
+        };
+        _underwaterOverlay.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        canvas.AddChild(_underwaterOverlay);
 
         // Water plane
         var waterShader = GD.Load<Shader>("res://shaders/water.gdshader");
@@ -386,6 +413,19 @@ public partial class Main : Node3D
 
         _terrainEditor.HandleToolHotkeys();
         UpdateAimIndicator();
+    }
+
+    private void UpdateUnderwaterEffect()
+    {
+        var underwater = _camera.GlobalPosition.Y < WaterLevel;
+        if (underwater == _isUnderwater)
+        {
+            return;
+        }
+
+        _isUnderwater = underwater;
+        _worldEnv.Environment = underwater ? _underwaterEnvironment : _normalEnvironment;
+        _underwaterOverlay.Visible = underwater;
     }
 
     private void UpdateAimIndicator()
