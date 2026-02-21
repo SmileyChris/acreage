@@ -19,12 +19,11 @@ public sealed class WorldStreamer
 
     public bool EnableLodTransitions { get; set; } = true;
     public int LodTransitionCooldownUpdates { get; set; } = 30;
-    public int MaxLodDemotionsPerUpdate { get; set; } = 0;
+    public int MaxLodDemotionsPerUpdate { get; set; } = 2;
     public bool EnableNeighborRemeshOnChunkReady { get; set; } = true;
-    public bool EnableSeamStepResolve { get; set; } = true;
+    public bool EnableSeamStepResolve { get; set; } = false;
     public int MaxLodTransitionsPerUpdate { get; set; } = 2;
     public int MaxRemeshesPerUpdate { get; set; } = 16;
-    public int NearRemeshDistance { get; set; } = 4;
     public bool TransitionRemeshIncludesNeighbors { get; set; } = false;
 
     public WorldStreamer(ChunkGenerationService generation, LodTier[] tiers)
@@ -100,7 +99,6 @@ public sealed class WorldStreamer
         var maxLodDemotionsPerUpdate = System.Math.Max(0, MaxLodDemotionsPerUpdate);
         var lodTransitionCooldownUpdates = System.Math.Max(0, LodTransitionCooldownUpdates);
         var maxRemeshesPerUpdate = System.Math.Max(0, MaxRemeshesPerUpdate);
-        var nearRemeshDistance = System.Math.Max(0, NearRemeshDistance);
         var highPriorityRemeshCandidates = new System.Collections.Generic.HashSet<ChunkCoord>();
         var lowPriorityRemeshCandidates = new System.Collections.Generic.HashSet<ChunkCoord>();
         var remeshRequests = new System.Collections.Generic.List<(DensityChunk Chunk, int DesiredStep)>();
@@ -231,7 +229,7 @@ public sealed class WorldStreamer
                     targetSet.Add(candidate.Coord);
                     if (TransitionRemeshIncludesNeighbors)
                     {
-                        foreach (var neighbor in GetFaceNeighborCoords(candidate.Coord))
+                        foreach (var neighbor in GetHorizontalNeighborCoords(candidate.Coord))
                         {
                             targetSet.Add(neighbor);
                         }
@@ -246,11 +244,6 @@ public sealed class WorldStreamer
                 if (remeshRequests.Count >= maxRemeshesPerUpdate)
                 {
                     break;
-                }
-
-                if (ChebyshevDistanceToCenter(coord, center) > nearRemeshDistance)
-                {
-                    continue;
                 }
 
                 if (_loaded.TryGetValue(coord, out var record) && record.Chunk is not null)
@@ -268,11 +261,6 @@ public sealed class WorldStreamer
                     if (remeshRequests.Count >= maxRemeshesPerUpdate)
                     {
                         break;
-                    }
-
-                    if (ChebyshevDistanceToCenter(coord, center) > nearRemeshDistance)
-                    {
-                        continue;
                     }
 
                     if (_loaded.TryGetValue(coord, out var record) && record.Chunk is not null)
@@ -339,9 +327,7 @@ public sealed class WorldStreamer
 
         PublishChunkMesh(chunk, step);
 
-        // Only re-mesh neighbors for full-detail chunks where boundary
-        // seam quality matters. At LOD2+ the seams are invisible at distance.
-        if (!EnableNeighborRemeshOnChunkReady || step > 1)
+        if (!EnableNeighborRemeshOnChunkReady)
         {
             return;
         }
@@ -349,7 +335,7 @@ public sealed class WorldStreamer
         var neighborChunks = new System.Collections.Generic.List<(DensityChunk Chunk, int Step)>();
         lock (_lock)
         {
-            foreach (var coord in GetFaceNeighborCoords(chunk.Coord))
+            foreach (var coord in GetHorizontalNeighborCoords(chunk.Coord))
             {
                 if (_loaded.TryGetValue(coord, out var record) && record.Chunk is not null)
                 {
@@ -439,11 +425,20 @@ public sealed class WorldStreamer
             // face-neighbor LOD step.
             ? ResolveMeshStep(chunk.Coord, desiredStep)
             : desiredStep;
-        var mesh = MarchingCubesMesher.Build(
-            chunk,
-            (gx, gy, gz) => SampleDensity(chunk, gx, gy, gz),
-            (gx, gy, gz) => SampleMaterial(chunk, gx, gy, gz),
-            step);
+        MeshData mesh;
+        chunk.EnterReadLock();
+        try
+        {
+            mesh = MarchingCubesMesher.Build(
+                chunk,
+                (gx, gy, gz) => SampleDensity(chunk, gx, gy, gz),
+                (gx, gy, gz) => SampleMaterial(chunk, gx, gy, gz),
+                step);
+        }
+        finally
+        {
+            chunk.ExitReadLock();
+        }
 
         lock (_lock)
         {
@@ -465,7 +460,7 @@ public sealed class WorldStreamer
         var resolved = desiredStep;
         lock (_lock)
         {
-            foreach (var neighborCoord in GetFaceNeighborCoords(coord))
+            foreach (var neighborCoord in GetHorizontalNeighborCoords(coord))
             {
                 if (_loaded.TryGetValue(neighborCoord, out var neighbor))
                 {
@@ -558,6 +553,17 @@ public sealed class WorldStreamer
             new ChunkCoord(coord.X - 1, coord.Y, coord.Z),
             new ChunkCoord(coord.X, coord.Y + 1, coord.Z),
             new ChunkCoord(coord.X, coord.Y - 1, coord.Z),
+            new ChunkCoord(coord.X, coord.Y, coord.Z + 1),
+            new ChunkCoord(coord.X, coord.Y, coord.Z - 1),
+        ];
+    }
+
+    private static ChunkCoord[] GetHorizontalNeighborCoords(ChunkCoord coord)
+    {
+        return
+        [
+            new ChunkCoord(coord.X + 1, coord.Y, coord.Z),
+            new ChunkCoord(coord.X - 1, coord.Y, coord.Z),
             new ChunkCoord(coord.X, coord.Y, coord.Z + 1),
             new ChunkCoord(coord.X, coord.Y, coord.Z - 1),
         ];

@@ -4,6 +4,7 @@ public sealed class DensityChunk
 {
     private readonly float[] _density;
     private readonly MaterialType[] _materials;
+    private readonly System.Threading.ReaderWriterLockSlim _rwLock = new();
 
     public DensityChunk(ChunkCoord coord, int sizeX = 16, int sizeY = 64, int sizeZ = 16)
     {
@@ -79,6 +80,11 @@ public sealed class DensityChunk
     {
         return gx >= 0 && gx < GridSizeX && gy >= 0 && gy < GridSizeY && gz >= 0 && gz < GridSizeZ;
     }
+
+    public void EnterReadLock() => _rwLock.EnterReadLock();
+    public void ExitReadLock() => _rwLock.ExitReadLock();
+    public void EnterWriteLock() => _rwLock.EnterWriteLock();
+    public void ExitWriteLock() => _rwLock.ExitWriteLock();
 
     private int ToIndex(int gx, int gy, int gz)
     {

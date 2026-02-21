@@ -79,7 +79,7 @@ public partial class Main : Node3D
     private bool _enableCollisionUpdates = true;
     private bool _enableLodTransitions = true;
     private bool _enableNeighborRemesh = true;
-    private bool _enableSeamResolve = true;
+    private bool _enableSeamResolve = false;
     private bool _enableRegionMap = true;
     private int _pruneCounter;
     private int _lastDrainedChunks;
@@ -122,9 +122,9 @@ public partial class Main : Node3D
 
         var forward = _camera.GlobalTransform.Basis * Vector3.Forward;
         _streamer?.UpdateFocusPosition(
-            _camera.GlobalPosition.X,
-            _camera.GlobalPosition.Y,
-            _camera.GlobalPosition.Z,
+            _player.GlobalPosition.X,
+            _player.GlobalPosition.Y,
+            _player.GlobalPosition.Z,
             ChunkSizeX,
             ChunkSizeY,
             ChunkSizeZ,
@@ -588,8 +588,17 @@ public partial class Main : Node3D
                     var coord = new ChunkCoord(x.Chunk, y.Chunk, z.Chunk);
                     if (_chunks.TryGetValue(coord, out var chunk))
                     {
-                        density = chunk.GetDensity(x.Local, y.Local, z.Local);
-                        material = chunk.GetMaterial(x.Local, y.Local, z.Local);
+                        chunk.EnterReadLock();
+                        try
+                        {
+                            density = chunk.GetDensity(x.Local, y.Local, z.Local);
+                            material = chunk.GetMaterial(x.Local, y.Local, z.Local);
+                        }
+                        finally
+                        {
+                            chunk.ExitReadLock();
+                        }
+
                         return true;
                     }
                 }
@@ -623,8 +632,17 @@ public partial class Main : Node3D
                         continue;
                     }
 
-                    chunk.SetDensity(x.Local, y.Local, z.Local, density);
-                    chunk.SetMaterial(x.Local, y.Local, z.Local, material);
+                    chunk.EnterWriteLock();
+                    try
+                    {
+                        chunk.SetDensity(x.Local, y.Local, z.Local, density);
+                        chunk.SetMaterial(x.Local, y.Local, z.Local, material);
+                    }
+                    finally
+                    {
+                        chunk.ExitWriteLock();
+                    }
+
                     touchedChunks.Add(coord);
                     changed = true;
                 }
@@ -646,8 +664,6 @@ public partial class Main : Node3D
         {
             remeshSet.Add(new ChunkCoord(coord.X + 1, coord.Y, coord.Z));
             remeshSet.Add(new ChunkCoord(coord.X - 1, coord.Y, coord.Z));
-            remeshSet.Add(new ChunkCoord(coord.X, coord.Y + 1, coord.Z));
-            remeshSet.Add(new ChunkCoord(coord.X, coord.Y - 1, coord.Z));
             remeshSet.Add(new ChunkCoord(coord.X, coord.Y, coord.Z + 1));
             remeshSet.Add(new ChunkCoord(coord.X, coord.Y, coord.Z - 1));
         }
