@@ -2,7 +2,12 @@ namespace Acreage.Voxel;
 
 public sealed class HillsGenerator : IChunkGenerator
 {
-    public static bool UseRegionMap { get; set; } = true;
+    public bool UseRegionMap { get; set; }
+
+    public HillsGenerator(bool useRegionMap = true)
+    {
+        UseRegionMap = useRegionMap;
+    }
 
     public DensityChunk Generate(ChunkCoord coord, int sizeX, int sizeY, int sizeZ)
     {

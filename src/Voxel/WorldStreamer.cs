@@ -482,12 +482,12 @@ public sealed class WorldStreamer
             return origin.GetDensity(gx, gy, gz);
         }
 
-        var offsetX = FloorDiv(gx, origin.SizeX);
-        var offsetY = FloorDiv(gy, origin.SizeY);
-        var offsetZ = FloorDiv(gz, origin.SizeZ);
-        var localX = PositiveMod(gx, origin.SizeX);
-        var localY = PositiveMod(gy, origin.SizeY);
-        var localZ = PositiveMod(gz, origin.SizeZ);
+        var offsetX = VoxelMath.FloorDiv(gx, origin.SizeX);
+        var offsetY = VoxelMath.FloorDiv(gy, origin.SizeY);
+        var offsetZ = VoxelMath.FloorDiv(gz, origin.SizeZ);
+        var localX = VoxelMath.PositiveMod(gx, origin.SizeX);
+        var localY = VoxelMath.PositiveMod(gy, origin.SizeY);
+        var localZ = VoxelMath.PositiveMod(gz, origin.SizeZ);
         var neighborCoord = new ChunkCoord(
             origin.Coord.X + offsetX,
             origin.Coord.Y + offsetY,
@@ -508,12 +508,12 @@ public sealed class WorldStreamer
             return origin.GetMaterial(gx, gy, gz);
         }
 
-        var offsetX = FloorDiv(gx, origin.SizeX);
-        var offsetY = FloorDiv(gy, origin.SizeY);
-        var offsetZ = FloorDiv(gz, origin.SizeZ);
-        var localX = PositiveMod(gx, origin.SizeX);
-        var localY = PositiveMod(gy, origin.SizeY);
-        var localZ = PositiveMod(gz, origin.SizeZ);
+        var offsetX = VoxelMath.FloorDiv(gx, origin.SizeX);
+        var offsetY = VoxelMath.FloorDiv(gy, origin.SizeY);
+        var offsetZ = VoxelMath.FloorDiv(gz, origin.SizeZ);
+        var localX = VoxelMath.PositiveMod(gx, origin.SizeX);
+        var localY = VoxelMath.PositiveMod(gy, origin.SizeY);
+        var localZ = VoxelMath.PositiveMod(gz, origin.SizeZ);
         var neighborCoord = new ChunkCoord(
             origin.Coord.X + offsetX,
             origin.Coord.Y + offsetY,
@@ -525,24 +525,6 @@ public sealed class WorldStreamer
         }
 
         return MaterialType.Air;
-    }
-
-    private static int FloorDiv(int value, int divisor)
-    {
-        var result = value / divisor;
-        var remainder = value % divisor;
-        if (remainder != 0 && ((value < 0) ^ (divisor < 0)))
-        {
-            result--;
-        }
-
-        return result;
-    }
-
-    private static int PositiveMod(int value, int modulus)
-    {
-        var m = value % modulus;
-        return m < 0 ? m + modulus : m;
     }
 
     private static ChunkCoord[] GetFaceNeighborCoords(ChunkCoord coord)
