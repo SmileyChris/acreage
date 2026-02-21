@@ -4,7 +4,7 @@ A voxel sandbox where you reclaim overgrown ruins using heavy machinery, power g
 
 ## Current State
 
-Cycles 1-2 are complete: smooth voxel terrain via Marching Cubes with multithreaded world streaming, terrain editing tools (dig, fill, concrete pad), water, procedural sky, and a third-person box character that walks on the terrain.
+Cycles 1-2 are complete: smooth voxel terrain via Marching Cubes with multithreaded world streaming, terrain editing tools (dig, fill, concrete pad), chunk persistence (edited terrain saves to disk and reloads across sessions), water, procedural sky, and a third-person box character that walks on the terrain.
 
 ### Controls
 

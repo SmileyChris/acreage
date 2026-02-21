@@ -6,6 +6,7 @@ public sealed class WorldStreamer
 {
     private readonly ChunkGenerationService _generation;
     private readonly LodTier[] _tiers;
+    private readonly ChunkStore? _store;
     private const int LodHysteresisChunks = 1;
     private readonly int _maxDistance;
     private readonly object _lock = new();
@@ -26,7 +27,7 @@ public sealed class WorldStreamer
     public int MaxRemeshesPerUpdate { get; set; } = 16;
     public bool TransitionRemeshIncludesNeighbors { get; set; } = false;
 
-    public WorldStreamer(ChunkGenerationService generation, LodTier[] tiers)
+    public WorldStreamer(ChunkGenerationService generation, LodTier[] tiers, ChunkStore? store = null)
     {
         if (tiers.Length == 0)
         {
@@ -35,6 +36,7 @@ public sealed class WorldStreamer
 
         _generation = generation;
         _tiers = tiers;
+        _store = store;
         _maxDistance = 0;
         foreach (var tier in tiers)
         {
@@ -155,6 +157,8 @@ public sealed class WorldStreamer
             }
         }
 
+        System.Collections.Generic.List<DensityChunk>? dirtyUnloaded = null;
+
         lock (_lock)
         {
             var toRemove = new System.Collections.Generic.List<ChunkCoord>();
@@ -168,6 +172,12 @@ public sealed class WorldStreamer
 
             foreach (var coord in toRemove)
             {
+                if (_store is not null && _chunkData.TryGetValue(coord, out var unloading) && unloading.IsDirty)
+                {
+                    dirtyUnloaded ??= new();
+                    dirtyUnloaded.Add(unloading);
+                }
+
                 _loaded.Remove(coord);
                 _chunkData.TryRemove(coord, out _);
             }
@@ -284,6 +294,46 @@ public sealed class WorldStreamer
         if (remeshRequests.Count > 0)
         {
             System.Threading.Interlocked.Add(ref _profileRemeshRequests, remeshRequests.Count);
+        }
+
+        if (dirtyUnloaded is not null)
+        {
+            foreach (var chunk in dirtyUnloaded)
+            {
+                chunk.EnterReadLock();
+                try
+                {
+                    _store!.Save(chunk);
+                }
+                finally
+                {
+                    chunk.ExitReadLock();
+                }
+            }
+        }
+    }
+
+    public void SaveAllDirty()
+    {
+        if (_store is null)
+        {
+            return;
+        }
+
+        foreach (var kvp in _chunkData)
+        {
+            if (kvp.Value.IsDirty)
+            {
+                kvp.Value.EnterReadLock();
+                try
+                {
+                    _store.Save(kvp.Value);
+                }
+                finally
+                {
+                    kvp.Value.ExitReadLock();
+                }
+            }
         }
     }
 
@@ -498,6 +548,11 @@ public sealed class WorldStreamer
             return neighbor.GetDensity(localX, localY, localZ);
         }
 
+        if (neighborCoord.Y < 0)
+        {
+            return 1000f;
+        }
+
         return 0f;
     }
 
@@ -522,6 +577,11 @@ public sealed class WorldStreamer
         if (_chunkData.TryGetValue(neighborCoord, out var neighbor))
         {
             return neighbor.GetMaterial(localX, localY, localZ);
+        }
+
+        if (neighborCoord.Y < 0)
+        {
+            return MaterialType.Stone;
         }
 
         return MaterialType.Air;

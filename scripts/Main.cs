@@ -49,6 +49,9 @@ public partial class Main : Node3D
     private bool _enableNeighborRemesh = true;
     private bool _enableSeamResolve = false;
     private bool _enableRegionMap = true;
+    private ImmediateMesh _aimLineMesh = null!;
+    private MeshInstance3D _aimLine = null!;
+    private MeshInstance3D _aimMarker = null!;
 
     public override void _Ready()
     {
@@ -64,6 +67,8 @@ public partial class Main : Node3D
 
     public override void _ExitTree()
     {
+        _streamer?.SaveAllDirty();
+
         if (_streamer is not null)
         {
             _streamer.ChunkMeshed -= _chunkRenderer.OnChunkMeshed;
@@ -240,14 +245,47 @@ public partial class Main : Node3D
             Position = new Vector3(0f, WaterLevel, 0f),
         };
         AddChild(_waterPlane);
+
+        // Aim indicator (faint line + small marker at terrain hit point)
+        var aimMaterial = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(1f, 1f, 1f, 0.3f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            NoDepthTest = true,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        };
+
+        _aimLineMesh = new ImmediateMesh();
+        _aimLine = new MeshInstance3D
+        {
+            Name = "AimLine",
+            Mesh = _aimLineMesh,
+            MaterialOverride = aimMaterial,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_aimLine);
+
+        _aimMarker = new MeshInstance3D
+        {
+            Name = "AimMarker",
+            Mesh = new SphereMesh { Radius = 0.12f, Height = 0.24f },
+            MaterialOverride = aimMaterial,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            Visible = false,
+        };
+        AddChild(_aimMarker);
     }
 
     private void SetupVoxelRuntime()
     {
         _generator = new HillsGenerator(_enableRegionMap);
+        var saveDir = System.IO.Path.Combine(OS.GetUserDataDir(), "chunks");
+        var store = new ChunkStore(saveDir);
+        var generator = new PersistentGenerator(_generator, store);
         var workerCount = Mathf.Max(1, System.Environment.ProcessorCount / 2);
-        _generation = new ChunkGenerationService(_generator, workerCount, ChunkSizeX, ChunkSizeY, ChunkSizeZ);
-        _streamer = new WorldStreamer(_generation, LodTiers);
+        _generation = new ChunkGenerationService(generator, workerCount, ChunkSizeX, ChunkSizeY, ChunkSizeZ);
+        _streamer = new WorldStreamer(_generation, LodTiers, store);
         ApplyStreamerPerfSettings();
         _streamer.ChunkMeshed += _chunkRenderer.OnChunkMeshed;
         _terrainEditor = new TerrainEditor(_camera, _player, _chunkRenderer, _streamer, () => GetWorld3D().DirectSpaceState);
@@ -347,6 +385,33 @@ public partial class Main : Node3D
         }
 
         _terrainEditor.HandleToolHotkeys();
+        UpdateAimIndicator();
+    }
+
+    private void UpdateAimIndicator()
+    {
+        _aimLineMesh.ClearSurfaces();
+
+        if (Input.MouseMode != Input.MouseModeEnum.Captured)
+        {
+            _aimMarker.Visible = false;
+            return;
+        }
+
+        if (_terrainEditor.TryGetTerrainHit(out var hitPoint, out _))
+        {
+            _aimLineMesh.SurfaceBegin(Mesh.PrimitiveType.Lines);
+            _aimLineMesh.SurfaceAddVertex(_camera.GlobalPosition);
+            _aimLineMesh.SurfaceAddVertex(hitPoint);
+            _aimLineMesh.SurfaceEnd();
+
+            _aimMarker.GlobalPosition = hitPoint;
+            _aimMarker.Visible = true;
+        }
+        else
+        {
+            _aimMarker.Visible = false;
+        }
     }
 
     private static void EnsureActionWithPhysicalKey(string action, Key key)

@@ -80,7 +80,7 @@ public sealed class TerrainEditor
         };
     }
 
-    private bool TryGetTerrainHit(out Vector3 hitPoint, out Vector3 normal)
+    public bool TryGetTerrainHit(out Vector3 hitPoint, out Vector3 normal)
     {
         hitPoint = default;
         normal = Vector3.Up;
@@ -277,6 +277,7 @@ public sealed class TerrainEditor
                     {
                         chunk.SetDensity(x.Local, y.Local, z.Local, density);
                         chunk.SetMaterial(x.Local, y.Local, z.Local, material);
+                        chunk.IsDirty = true;
                     }
                     finally
                     {

@@ -9,18 +9,15 @@ Tasks:
 
 Win State: Fly around procedural rolling hills at 60 FPS with smooth, organic terrain and material-colored surfaces (grass/dirt/stone).
 
-Cycle 2: The Physical Interface (Sculpting & Terraforming)
+Cycle 2: The Physical Interface (Sculpting & Terraforming) — COMPLETE
 Goal: Interact with the density field to shape terrain.
 
 Tasks:
-
-Implement raycasting against chunk meshes (or density-field ray marching) to find the world-space sculpt point on the isosurface.
-
-Write density modification tools: subtract density in a spherical brush (dig/terraform), add density with a material type (fill/flatten/pave).
-
-Trigger mesh rebuild for the modified chunk AND its face neighbors (border samples change).
-
-Implement manufactured placement: stamp flat density regions with MaterialType.Concrete for smooth-to-flat transitions.
+* Implement physics raycasting from camera to find terrain hit point on the isosurface.
+* Write density modification tools: spherical brush dig (subtract density) and fill (add density with material).
+* Trigger mesh rebuild for the modified chunk AND its face neighbors (border samples change).
+* Implement manufactured placement: stamp flat density regions with MaterialType.Concrete for smooth-to-flat transitions.
+* Add aim indicator (faint line + marker at terrain hit point) for sculpt point visibility.
 
 Win State: Sculpt a drainage trench and flatten a concrete pad.
 

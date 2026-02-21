@@ -27,6 +27,7 @@ public sealed class DensityChunk
     }
 
     public ChunkCoord Coord { get; }
+    public bool IsDirty { get; set; }
 
     public int SizeX { get; }
     public int SizeY { get; }
@@ -35,6 +36,9 @@ public sealed class DensityChunk
     public int GridSizeX { get; }
     public int GridSizeY { get; }
     public int GridSizeZ { get; }
+
+    internal float[] RawDensity => _density;
+    internal MaterialType[] RawMaterials => _materials;
 
     public float GetDensity(int gx, int gy, int gz)
     {
